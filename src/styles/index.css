@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+:root {
+  color: #162033;
+  background: #f7f8fa;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+    sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: #f7f8fa;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+@theme {
+  --color-ink: #162033;
+  --color-muted: #6d7789;
+  --color-line: #e4e8ef;
+  --color-page: #f7f8fa;
+  --color-primary: #3b82f6;
+  --color-primary-soft: #eaf2ff;
+  --color-success: #16a34a;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --radius-card: 8px;
+  --shadow-card: 0 8px 24px rgb(22 32 51 / 0.05);
+}
+
+.safe-pb {
+  padding-bottom: calc(84px + var(--safe-bottom));
+}
+
+.safe-top {
+  padding-top: var(--safe-top);
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
