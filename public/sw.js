@@ -1,5 +1,15 @@
 const CACHE_NAME = 'kaoyan-partner-pwa-v2'
-const APP_SHELL = ['/', '/login', '/manifest.json', '/favicon.svg', '/icons/icon-180.png', '/icons/icon-192.png', '/icons/icon-512.png']
+const BASE_PATH = new URL(self.registration.scope).pathname.replace(/\/$/, '')
+const withBase = (path) => `${BASE_PATH}${path}`
+const APP_SHELL = [
+  '/',
+  '/login',
+  '/manifest.json',
+  '/favicon.svg',
+  '/icons/icon-180.png',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+].map(withBase)
 const isSameOrigin = (request) => new URL(request.url).origin === self.location.origin
 const isAssetRequest = (request) => ['script', 'style', 'image', 'font'].includes(request.destination)
 
@@ -26,10 +36,10 @@ self.addEventListener('fetch', (event) => {
       fetch(request)
         .then((response) => {
           const copy = response.clone()
-          caches.open(CACHE_NAME).then((cache) => cache.put('/', copy))
+          caches.open(CACHE_NAME).then((cache) => cache.put(withBase('/'), copy))
           return response
         })
-        .catch(() => caches.match('/') || caches.match('/login')),
+        .catch(() => caches.match(withBase('/')) || caches.match(withBase('/login'))),
     )
     return
   }
