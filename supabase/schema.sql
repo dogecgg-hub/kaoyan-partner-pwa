@@ -96,7 +96,20 @@ alter table public.reviews enable row level security;
 alter table public.pomodoro_sessions enable row level security;
 
 -- MVP-friendly policies for fixed partners. Tighten these after wiring auth.uid()
--- to profile ids in production.
+-- to profile ids in production. Drop first so this file is safe to run again.
+drop policy if exists "profiles readable" on public.profiles;
+drop policy if exists "profiles writable" on public.profiles;
+drop policy if exists "tasks readable" on public.tasks;
+drop policy if exists "tasks writable" on public.tasks;
+drop policy if exists "check_ins readable" on public.check_ins;
+drop policy if exists "check_ins writable" on public.check_ins;
+drop policy if exists "messages readable" on public.messages;
+drop policy if exists "messages writable" on public.messages;
+drop policy if exists "reviews readable" on public.reviews;
+drop policy if exists "reviews writable" on public.reviews;
+drop policy if exists "pomodoro readable" on public.pomodoro_sessions;
+drop policy if exists "pomodoro writable" on public.pomodoro_sessions;
+
 create policy "profiles readable" on public.profiles for select using (true);
 create policy "profiles writable" on public.profiles for all using (true) with check (true);
 create policy "tasks readable" on public.tasks for select using (true);

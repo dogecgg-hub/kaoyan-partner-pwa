@@ -7,6 +7,9 @@ import { Button, Card, Field, inputClass } from '../components/ui'
 export const Login = () => {
   const currentUserId = useAppStore((state) => state.currentUserId)
   const login = useAppStore((state) => state.login)
+  const dataMode = useAppStore((state) => state.dataMode)
+  const syncStatus = useAppStore((state) => state.syncStatus)
+  const syncError = useAppStore((state) => state.syncError)
   const [email, setEmail] = useState('userA@example.com')
   const [password, setPassword] = useState('password123')
   const [error, setError] = useState('')
@@ -51,7 +54,8 @@ export const Login = () => {
           <div className="grid gap-2 rounded-card bg-slate-50 p-3 text-xs leading-5 text-muted">
             <p>演示账号：userA@example.com / password123</p>
             <p>演示账号：userB@example.com / password123</p>
-            <p>注册和忘记密码已预留 UI，真实逻辑可接 Supabase Auth。</p>
+            <p>{dataMode === 'supabase' ? `Supabase 同步：${syncStatus}` : '当前为本地离线模式，可独立运行。'}</p>
+            {syncError && <p className="text-danger">{syncError}</p>}
           </div>
           <Button variant="ghost" type="button">忘记密码</Button>
         </Card>

@@ -1,6 +1,7 @@
-const CACHE_NAME = 'kaoyan-partner-pwa-v1'
-const APP_SHELL = ['/', '/manifest.json', '/favicon.svg', '/icons/icon-180.png', '/icons/icon-192.png']
+const CACHE_NAME = 'kaoyan-partner-pwa-v2'
+const APP_SHELL = ['/', '/login', '/manifest.json', '/favicon.svg', '/icons/icon-180.png', '/icons/icon-192.png', '/icons/icon-512.png']
 const isSameOrigin = (request) => new URL(request.url).origin === self.location.origin
+const isAssetRequest = (request) => ['script', 'style', 'image', 'font'].includes(request.destination)
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)))
@@ -28,12 +29,17 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put('/', copy))
           return response
         })
-        .catch(() => caches.match('/')),
+        .catch(() => caches.match('/') || caches.match('/login')),
     )
     return
   }
 
   if (!isSameOrigin(request)) return
+
+  if (!isAssetRequest(request)) {
+    event.respondWith(fetch(request).catch(() => caches.match(request)))
+    return
+  }
 
   event.respondWith(
     caches.match(request).then((cached) => {
@@ -45,7 +51,7 @@ self.addEventListener('fetch', (event) => {
         const copy = response.clone()
         caches.open(CACHE_NAME).then((cache) => cache.put(request, copy))
         return response
-      }).catch(() => caches.match('/'))
+      })
     }),
   )
 })

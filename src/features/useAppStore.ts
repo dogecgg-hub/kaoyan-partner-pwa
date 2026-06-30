@@ -12,11 +12,16 @@ import type {
 } from '../types/domain'
 import { initialData } from '../data/mock'
 import { clearData, loadData, saveData } from '../services/storage'
+import { dataMode, supabaseService } from '../services/supabase'
 import { todayISO } from '../utils/date'
 
 type TaskInput = Omit<Task, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'completedAt'>
 
 interface AppStore extends AppData {
+  dataMode: 'localStorage' | 'supabase'
+  syncStatus: 'idle' | 'syncing' | 'ready' | 'error'
+  syncError?: string
+  hydrateRemoteData: () => Promise<void>
   login: (email: string, password: string) => boolean
   logout: () => void
   resetAll: () => void
@@ -35,25 +40,62 @@ interface AppStore extends AppData {
 const createId = (prefix: string) => `${prefix}-${crypto.randomUUID()}`
 const persisted = typeof window === 'undefined' ? undefined : loadData()
 
+const persistSnapshot = (data: AppData) =>
+  saveData({
+    currentUserId: data.currentUserId,
+    users: data.users,
+    tasks: data.tasks,
+    checkIns: data.checkIns,
+    messages: data.messages,
+    reviews: data.reviews,
+    pomodoros: data.pomodoros,
+  })
+
 const commit = (set: (fn: (state: AppStore) => Partial<AppStore>) => void, fn: (state: AppStore) => Partial<AppStore>) =>
   set((state) => {
     const patch = fn(state)
     const next = { ...state, ...patch }
-    saveData({
-      currentUserId: next.currentUserId,
-      users: next.users,
-      tasks: next.tasks,
-      checkIns: next.checkIns,
-      messages: next.messages,
-      reviews: next.reviews,
-      pomodoros: next.pomodoros,
-    })
+    persistSnapshot(next)
     return patch
   })
+
+const runRemote = async (operation: () => Promise<unknown>) => {
+  if (dataMode !== 'supabase') return
+  try {
+    await operation()
+  } catch (error) {
+    console.warn('Supabase sync failed', error)
+  }
+}
 
 export const useAppStore = create<AppStore>((set) => ({
   ...initialData,
   ...persisted,
+  dataMode,
+  syncStatus: dataMode === 'supabase' ? 'idle' : 'ready',
+
+  hydrateRemoteData: async () => {
+    if (dataMode !== 'supabase') return
+    set({ syncStatus: 'syncing', syncError: undefined })
+    try {
+      const remote = await supabaseService.getAllData()
+      const hasRemoteSeed = remote.users.length > 0
+      const next = hasRemoteSeed
+        ? remote
+        : {
+            ...initialData,
+            currentUserId: useAppStore.getState().currentUserId,
+          }
+      if (!hasRemoteSeed) await supabaseService.seedData(next)
+      persistSnapshot(next)
+      set({ ...next, syncStatus: 'ready', syncError: undefined })
+    } catch (error) {
+      set({
+        syncStatus: 'error',
+        syncError: error instanceof Error ? error.message : 'Supabase 同步失败，已切换为本地可用模式。',
+      })
+    }
+  },
 
   login: (email, password) => {
     const normalized = email.trim().toLowerCase()
@@ -75,61 +117,77 @@ export const useAppStore = create<AppStore>((set) => ({
     commit(set, (state) => {
       if (!state.currentUserId) return {}
       const now = new Date().toISOString()
+      const nextTask = {
+        ...task,
+        id: createId('task'),
+        userId: state.currentUserId,
+        createdAt: now,
+        updatedAt: now,
+        completedAt: task.status === '已完成' ? now : undefined,
+      }
+      runRemote(() => supabaseService.upsertTask(nextTask))
       return {
-        tasks: [
-          {
-            ...task,
-            id: createId('task'),
-            userId: state.currentUserId,
-            createdAt: now,
-            updatedAt: now,
-            completedAt: task.status === '已完成' ? now : undefined,
-          },
-          ...state.tasks,
-        ],
+        tasks: [nextTask, ...state.tasks],
       }
     }),
 
   updateTask: (id, patch) =>
-    commit(set, (state) => ({
-      tasks: state.tasks.map((task) =>
-        task.id === id ? { ...task, ...patch, updatedAt: new Date().toISOString() } : task,
-      ),
-    })),
+    commit(set, (state) => {
+      let nextTask: Task | undefined
+      const tasks = state.tasks.map((task) => {
+        if (task.id !== id) return task
+        nextTask = { ...task, ...patch, updatedAt: new Date().toISOString() }
+        return nextTask
+      })
+      if (nextTask) {
+        const taskToSync = nextTask
+        runRemote(() => supabaseService.upsertTask(taskToSync))
+      }
+      return { tasks }
+    }),
 
-  deleteTask: (id) => commit(set, (state) => ({ tasks: state.tasks.filter((task) => task.id !== id) })),
+  deleteTask: (id) =>
+    commit(set, (state) => {
+      runRemote(() => supabaseService.deleteTask(id))
+      return { tasks: state.tasks.filter((task) => task.id !== id) }
+    }),
 
   setTaskStatus: (id, status) =>
     commit(set, (state) => {
       const now = new Date().toISOString()
+      let nextTask: Task | undefined
+      const tasks = state.tasks.map((task) => {
+        if (task.id !== id) return task
+        nextTask = {
+          ...task,
+          status,
+          actualMinutes: status === '已完成' ? task.actualMinutes || task.estimatedMinutes : task.actualMinutes,
+          completedAt: status === '已完成' ? now : undefined,
+          updatedAt: now,
+        }
+        return nextTask
+      })
+      if (nextTask) {
+        const taskToSync = nextTask
+        runRemote(() => supabaseService.upsertTask(taskToSync))
+      }
       return {
-        tasks: state.tasks.map((task) =>
-          task.id === id
-            ? {
-                ...task,
-                status,
-                actualMinutes: status === '已完成' ? task.actualMinutes || task.estimatedMinutes : task.actualMinutes,
-                completedAt: status === '已完成' ? now : undefined,
-                updatedAt: now,
-              }
-            : task,
-        ),
+        tasks,
       }
     }),
 
   addCheckIn: (payload) =>
     commit(set, (state) => {
       if (!state.currentUserId) return {}
+      const checkIn = {
+        ...payload,
+        id: createId('check'),
+        userId: state.currentUserId,
+        createdAt: new Date().toISOString(),
+      }
+      runRemote(() => supabaseService.addCheckIn(checkIn))
       return {
-        checkIns: [
-          {
-            ...payload,
-            id: createId('check'),
-            userId: state.currentUserId,
-            createdAt: new Date().toISOString(),
-          },
-          ...state.checkIns,
-        ],
+        checkIns: [checkIn, ...state.checkIns],
       }
     }),
 
@@ -147,20 +205,27 @@ export const useAppStore = create<AppStore>((set) => ({
         read: false,
         createdAt: new Date().toISOString(),
       }
+      runRemote(() => supabaseService.addMessage(message))
       return { messages: [message, ...state.messages] }
     }),
 
   markMessageRead: (id) =>
-    commit(set, (state) => ({
-      messages: state.messages.map((message) => (message.id === id ? { ...message, read: true } : message)),
-    })),
+    commit(set, (state) => {
+      runRemote(() => supabaseService.markMessageRead(id))
+      return {
+        messages: state.messages.map((message) => (message.id === id ? { ...message, read: true } : message)),
+      }
+    }),
 
   markAllRead: () =>
-    commit(set, (state) => ({
-      messages: state.messages.map((message) =>
-        message.toUserId === state.currentUserId ? { ...message, read: true } : message,
-      ),
-    })),
+    commit(set, (state) => {
+      if (state.currentUserId) runRemote(() => supabaseService.markAllMessagesRead(state.currentUserId!))
+      return {
+        messages: state.messages.map((message) =>
+          message.toUserId === state.currentUserId ? { ...message, read: true } : message,
+        ),
+      }
+    }),
 
   addReview: (payload) =>
     commit(set, (state) => {
@@ -174,6 +239,7 @@ export const useAppStore = create<AppStore>((set) => ({
         date: todayISO(),
         createdAt: new Date().toISOString(),
       }
+      runRemote(() => supabaseService.addReview(review))
       return { reviews: [review, ...state.reviews] }
     }),
 
@@ -200,6 +266,11 @@ export const useAppStore = create<AppStore>((set) => ({
               : task,
           )
         : state.tasks
+      runRemote(async () => {
+        await supabaseService.addPomodoro(session)
+        const changedTask = payload.taskId ? tasks.find((task) => task.id === payload.taskId) : undefined
+        if (changedTask) await supabaseService.upsertTask(changedTask)
+      })
       return { pomodoros: [session, ...state.pomodoros], tasks }
     }),
 }))

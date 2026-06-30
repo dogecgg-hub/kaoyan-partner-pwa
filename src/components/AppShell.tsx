@@ -30,13 +30,17 @@ export const AppShell = () => {
   const unread = useAppStore(
     (state) => state.messages.filter((message) => message.toUserId === state.currentUserId && !message.read).length,
   )
+  const dataMode = useAppStore((state) => state.dataMode)
+  const syncStatus = useAppStore((state) => state.syncStatus)
 
   return (
     <div className="min-h-screen bg-page text-ink">
       <header className="safe-top sticky top-0 z-20 border-b border-line/80 bg-page/95 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
           <div>
-            <p className="text-xs text-muted">{currentUser?.targetSchool}</p>
+            <p className="text-xs text-muted">
+              {currentUser?.targetSchool} · {dataMode === 'supabase' ? `Supabase ${syncStatus}` : '本地模式'}
+            </p>
             <h1 className="text-lg font-bold tracking-normal">{titles[location.pathname] ?? '考研搭子'}</h1>
           </div>
           <NavLink

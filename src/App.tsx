@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { BrowserRouter } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
@@ -24,6 +24,12 @@ const RequireAuth = () => {
 }
 
 function App() {
+  const hydrateRemoteData = useAppStore((state) => state.hydrateRemoteData)
+
+  useEffect(() => {
+    hydrateRemoteData()
+  }, [hydrateRemoteData])
+
   return (
     <BrowserRouter>
       <Suspense fallback={<div className="min-h-screen bg-page p-6 text-sm text-muted">正在加载...</div>}>

@@ -9,6 +9,8 @@ export const Profile = () => {
   const { currentUser, partner } = useSession()
   const logout = useAppStore((state) => state.logout)
   const resetAll = useAppStore((state) => state.resetAll)
+  const dataMode = useAppStore((state) => state.dataMode)
+  const syncStatus = useAppStore((state) => state.syncStatus)
   if (!currentUser || !partner) return null
   const remaining = Math.max(0, -daysBetween(currentUser.examDate))
 
@@ -28,10 +30,11 @@ export const Profile = () => {
         <Info label="每日目标" value={minutesToHourText(currentUser.dailyGoalMinutes)} />
         <Info label="考研倒计时" value={`${remaining} 天`} />
         <Info label="固定搭档" value={`${partner.name} · ${partner.targetSchool}`} />
+        <Info label="数据模式" value={dataMode === 'supabase' ? `Supabase ${syncStatus}` : '本地离线'} />
       </Card>
       <Card className="grid gap-3">
         <h3 className="font-bold">添加到 iPhone 主屏幕</h3>
-        <p className="text-sm leading-6 text-muted">在 Safari 打开本地地址，点击分享按钮，选择“添加到主屏幕”。应用已配置 manifest、主题色和安全区域适配。</p>
+        <p className="text-sm leading-6 text-muted">在 Safari 打开 Vercel 公网地址，点击分享按钮，选择“添加到主屏幕”。首次在线打开后，应用会缓存外壳；如遇打不开，先关闭 VPN/切换 Wi-Fi 或蜂窝网络，再重新打开。</p>
       </Card>
       <Card className="grid gap-2">
         <Button variant="secondary" onClick={logout}><LogOut size={17} />退出登录</Button>
