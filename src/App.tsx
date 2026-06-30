@@ -1,10 +1,12 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { BrowserRouter } from 'react-router-dom'
+import { BrowserRouter, HashRouter } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
 import { useAppStore } from './features/useAppStore'
 import { Login } from './pages/Login'
 
+const useHashRouter = import.meta.env.VITE_ROUTER_MODE === 'hash'
+const Router = useHashRouter ? HashRouter : BrowserRouter
 const routerBaseName = import.meta.env.BASE_URL === '/' ? undefined : import.meta.env.BASE_URL
 
 const Calendar = lazy(() => import('./pages/Calendar').then((module) => ({ default: module.Calendar })))
@@ -33,7 +35,7 @@ function App() {
   }, [hydrateRemoteData])
 
   return (
-    <BrowserRouter basename={routerBaseName}>
+    <Router basename={useHashRouter ? undefined : routerBaseName}>
       <Suspense fallback={<div className="min-h-screen bg-page p-6 text-sm text-muted">正在加载...</div>}>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -51,7 +53,7 @@ function App() {
           </Route>
         </Routes>
       </Suspense>
-    </BrowserRouter>
+    </Router>
   )
 }
 
