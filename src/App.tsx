@@ -5,6 +5,8 @@ import { AppShell } from './components/AppShell'
 import { useAppStore } from './features/useAppStore'
 import { Login } from './pages/Login'
 
+const routerBaseName = import.meta.env.BASE_URL === '/' ? undefined : import.meta.env.BASE_URL
+
 const Calendar = lazy(() => import('./pages/Calendar').then((module) => ({ default: module.Calendar })))
 const CheckIn = lazy(() => import('./pages/CheckIn').then((module) => ({ default: module.CheckIn })))
 const Dashboard = lazy(() => import('./pages/Dashboard').then((module) => ({ default: module.Dashboard })))
@@ -31,7 +33,7 @@ function App() {
   }, [hydrateRemoteData])
 
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={routerBaseName}>
       <Suspense fallback={<div className="min-h-screen bg-page p-6 text-sm text-muted">正在加载...</div>}>
         <Routes>
           <Route path="/login" element={<Login />} />
